@@ -22,8 +22,9 @@ public class BloodRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "needy_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Needy needy;
 
     @Column(nullable = false)

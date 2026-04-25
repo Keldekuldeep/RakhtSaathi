@@ -47,6 +47,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/needy/**").hasRole("NEEDY")
                 .requestMatchers("/api/donor/**").hasRole("DONOR")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Blood requests - NEEDY creates, DONOR views, both can access
+                .requestMatchers("/api/requests/**").hasAnyRole("NEEDY", "DONOR", "ADMIN")
+                .requestMatchers("/api/feedback/**").hasAnyRole("NEEDY", "DONOR", "ADMIN")
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())

@@ -17,6 +17,8 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
 
     Page<BloodRequest> findByNeedyOrderByCreatedAtDesc(Needy needy, Pageable pageable);
 
+    Page<BloodRequest> findByNeedyAndStatusOrderByCreatedAtDesc(Needy needy, RequestStatus status, Pageable pageable);
+
     Page<BloodRequest> findByStatusOrderByCreatedAtDesc(RequestStatus status, Pageable pageable);
 
     Page<BloodRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
@@ -27,4 +29,8 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
 
     @Query("SELECT br FROM BloodRequest br WHERE br.needy.id = :needyId ORDER BY br.createdAt DESC")
     Page<BloodRequest> findByNeedyId(@Param("needyId") Long needyId, Pageable pageable);
+
+    // For donor - find active requests by city
+    @Query("SELECT br FROM BloodRequest br WHERE br.city = :city AND br.status = 'ACTIVE' ORDER BY br.createdAt DESC")
+    List<BloodRequest> findActiveRequestsByCity(@Param("city") String city);
 }

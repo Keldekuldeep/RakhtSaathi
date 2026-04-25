@@ -2,37 +2,32 @@ package com.rakhtsaathi.dto.response;
 
 import com.rakhtsaathi.entity.enums.BloodGroup;
 import lombok.*;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 @Builder
-public class DonorProfileResponse {
+public class AdminDonorResponse {
     private Long id;
     private Long userId;
     private String fullName;
-    // Frontend uses both 'fullName' and 'name'
-    private String name;
+    private String name;            // alias
     private String email;
     private BloodGroup bloodGroup;
     private String city;
     private String district;
     private String phone;
-    // Frontend uses both 'phone' and 'contactNumber'
-    private String contactNumber;
+    private String contactNumber;   // alias
     private Integer age;
     private Double weight;
     private String gender;
-    private String aadhaarNumber;
     private Boolean isAvailable;
     private Integer totalDonations;
-    private Integer donationCount;
+    private Integer donationCount;  // alias
     private Double rating;
     private Integer totalFeedbackCount;
     private LocalDate lastDonationDate;
     private Boolean isVerified;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

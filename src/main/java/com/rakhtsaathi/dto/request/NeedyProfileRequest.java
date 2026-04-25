@@ -20,4 +20,13 @@ public class NeedyProfileRequest {
 
     @NotBlank(message = "Relation to patient is required")
     private String relationToPatient;
+
+    // Optional fields for profile update
+    private String phone;
+    private String address;
+    private String state;
+    private String pincode;
+    private String emergencyContactName;
+    private String emergencyContactPhone;
+    private String emergencyContactRelation;
 }

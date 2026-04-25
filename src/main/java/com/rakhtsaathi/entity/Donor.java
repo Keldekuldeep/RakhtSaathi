@@ -1,5 +1,6 @@
 package com.rakhtsaathi.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.rakhtsaathi.entity.enums.BloodGroup;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,8 +21,9 @@ public class Donor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JsonIgnore
     private User user;
 
     @Enumerated(EnumType.STRING)
@@ -30,6 +32,8 @@ public class Donor {
 
     @Column(nullable = false)
     private String city;
+
+    private String district;
 
     @Column(nullable = false)
     private String phone;
@@ -40,6 +44,10 @@ public class Donor {
     @Column(nullable = false)
     private Double weight;
 
+    private String gender;
+
+    private String aadhaarNumber;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean isAvailable = true;
@@ -47,10 +55,20 @@ public class Donor {
     @Builder.Default
     private Integer totalDonations = 0;
 
+    // Frontend uses both 'donationCount' and 'totalDonations'
+    @Builder.Default
+    private Integer donationCount = 0;
+
     @Builder.Default
     private Double rating = 0.0;
 
+    @Builder.Default
+    private Integer totalFeedbackCount = 0;
+
     private LocalDate lastDonationDate;
+
+    @Builder.Default
+    private Boolean isVerified = false;
 
     @CreationTimestamp
     @Column(updatable = false)

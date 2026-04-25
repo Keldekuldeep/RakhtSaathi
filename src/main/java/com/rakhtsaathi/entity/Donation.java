@@ -4,39 +4,48 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "feedback")
+@Table(name = "donations")
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 @Builder
-public class Feedback {
+public class Donation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "blood_request_id", nullable = false)
+    @JoinColumn(name = "donor_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Donor donor;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "blood_request_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private BloodRequest bloodRequest;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "from_user_id", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private User fromUser;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "to_user_id")
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private User toUser;
+    @Column(nullable = false)
+    private String hospitalName;
 
     @Column(nullable = false)
-    private Integer rating;
+    private LocalDate donationDate;
 
-    @Column(columnDefinition = "TEXT")
-    private String comment;
+    private String proofImageUrl;
+
+    private String notes;
+
+    @Builder.Default
+    private Integer units = 1;
+
+    // PENDING, VERIFIED, REJECTED
+    @Builder.Default
+    private String status = "PENDING";
+
+    private String certificateId;
 
     @CreationTimestamp
     @Column(updatable = false)

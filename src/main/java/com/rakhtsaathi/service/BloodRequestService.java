@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -70,52 +71,105 @@ public class BloodRequestService {
         return toResponse(request);
     }
 
-    public Page<BloodRequestResponse> getMyRequests(User user, int page, int size) {
+    // Frontend calls: getBloodRequests() - needy dashboard & history
+    public Page<BloodRequestResponse> getMyRequests(User user, int page, int size, String status) {
         Needy needy = needyService.getProfile(user);
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<BloodRequest> requests = bloodRequestRepository.findByNeedyOrderByCreatedAtDesc(needy, pageable);
+
+        Page<BloodRequest> requests;
+        if (status != null && !status.equals("ALL")) {
+            // Frontend uses 'COMPLETED', backend uses 'FULFILLED' - handle both
+            String mappedStatus = status.equals("COMPLETED") ? "FULFILLED" : status;
+            try {
+                RequestStatus requestStatus = RequestStatus.valueOf(mappedStatus);
+                requests = bloodRequestRepository.findByNeedyAndStatusOrderByCreatedAtDesc(needy, requestStatus, pageable);
+            } catch (IllegalArgumentException e) {
+                requests = bloodRequestRepository.findByNeedyOrderByCreatedAtDesc(needy, pageable);
+            }
+        } else {
+            requests = bloodRequestRepository.findByNeedyOrderByCreatedAtDesc(needy, pageable);
+        }
+
         return requests.map(this::toResponse);
     }
 
+    // Frontend: updateBloodRequest(id, {status: 'CANCELLED'})
     @Transactional
     public BloodRequestResponse cancelRequest(Long requestId, User user) {
-        BloodRequest request = bloodRequestRepository.findById(requestId)
-                .orElseThrow(() -> new ResourceNotFoundException("BloodRequest", requestId));
-
-        if (!request.getNeedy().getUser().getId().equals(user.getId())) {
-            throw new UnauthorizedException("You can only cancel your own requests");
-        }
+        BloodRequest request = getAndValidateOwnership(requestId, user);
 
         if (request.getStatus() != RequestStatus.ACTIVE) {
             throw new IllegalArgumentException("Only ACTIVE requests can be cancelled");
         }
 
         request.setStatus(RequestStatus.CANCELLED);
+        log.info("Request {} cancelled by user {}", requestId, user.getEmail());
         return toResponse(bloodRequestRepository.save(request));
     }
 
+    // Frontend: updateBloodRequest(id, {status: 'FULFILLED'})
     @Transactional
     public BloodRequestResponse fulfillRequest(Long requestId, User user) {
-        BloodRequest request = bloodRequestRepository.findById(requestId)
-                .orElseThrow(() -> new ResourceNotFoundException("BloodRequest", requestId));
+        BloodRequest request = getAndValidateOwnership(requestId, user);
 
-        if (!request.getNeedy().getUser().getId().equals(user.getId())) {
-            throw new UnauthorizedException("You can only fulfill your own requests");
+        if (request.getStatus() != RequestStatus.ACTIVE) {
+            throw new IllegalArgumentException("Only ACTIVE requests can be fulfilled");
         }
 
         request.setStatus(RequestStatus.FULFILLED);
         request.setFulfilledAt(LocalDateTime.now());
+        log.info("Request {} fulfilled by user {}", requestId, user.getEmail());
         return toResponse(bloodRequestRepository.save(request));
     }
 
-    // Admin: get all requests with pagination
-    public Page<BloodRequestResponse> getAllRequests(int page, int size) {
+    // Admin: get all requests with pagination + optional status filter
+    public Page<BloodRequestResponse> getAllRequests(int page, int size, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        if (status != null && !status.equals("ALL")) {
+            try {
+                RequestStatus requestStatus = RequestStatus.valueOf(status);
+                return bloodRequestRepository.findByStatusOrderByCreatedAtDesc(requestStatus, pageable)
+                        .map(this::toResponse);
+            } catch (IllegalArgumentException e) {
+                // fall through to all
+            }
+        }
         return bloodRequestRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
     }
 
-    private BloodRequestResponse toResponse(BloodRequest request) {
-        List<DonorNotificationResponse> notifications = notificationRepository
+    private BloodRequest getAndValidateOwnership(Long requestId, User user) {
+        BloodRequest request = bloodRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("BloodRequest", requestId));
+
+        if (!request.getNeedy().getUser().getId().equals(user.getId())) {
+            throw new UnauthorizedException("You can only modify your own requests");
+        }
+        return request;
+    }
+
+    @Transactional
+    public int triggerNotification(Long requestId, User user) {
+        BloodRequest request = bloodRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("BloodRequest", requestId));
+
+        // Validate ownership
+        if (!request.getNeedy().getUser().getId().equals(user.getId())) {
+            throw new UnauthorizedException("You can only trigger notifications for your own requests");
+        }
+
+        if (request.getStatus() != RequestStatus.ACTIVE) {
+            throw new IllegalArgumentException("Can only trigger notifications for ACTIVE requests");
+        }
+
+        // Trigger async notification
+        notificationService.notifyDonors(request);
+        log.info("Manual notification triggered for request {} by user {}", requestId, user.getEmail());
+        return request.getNotifiedDonorsCount();
+    }
+
+    public BloodRequestResponse toResponse(BloodRequest request) {
+        List<DonorNotificationResponse> notificationList = notificationRepository
                 .findByBloodRequest(request)
                 .stream()
                 .map(n -> DonorNotificationResponse.builder()
@@ -124,31 +178,63 @@ public class BloodRequestService {
                         .bloodGroup(n.getDonor().getBloodGroup())
                         .city(n.getDonor().getCity())
                         .phone(n.getStatus() == com.rakhtsaathi.entity.enums.DonorResponseStatus.ACCEPTED
-                                ? n.getDonor().getPhone() : null) // Only show phone if accepted
+                                ? n.getDonor().getPhone() : null)
                         .status(n.getStatus())
                         .notifiedAt(n.getNotifiedAt())
                         .respondedAt(n.getRespondedAt())
                         .build())
                 .collect(Collectors.toList());
 
+        // Build notifiedDonors map matching frontend's expected format
+        // Frontend uses: request.notifiedDonors[donorId].donorInfo.fullName etc.
+        Map<String, BloodRequestResponse.DonorNotificationMapEntry> notifiedDonorsMap =
+                notificationRepository.findByBloodRequest(request)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                n -> String.valueOf(n.getDonor().getId()),
+                                n -> BloodRequestResponse.DonorNotificationMapEntry.builder()
+                                        .status(n.getStatus().name())
+                                        .notifiedAt(n.getNotifiedAt())
+                                        .respondedAt(n.getRespondedAt())
+                                        .donorInfo(BloodRequestResponse.DonorNotificationMapEntry.DonorInfo.builder()
+                                                .fullName(n.getDonor().getUser().getFullName())
+                                                .bloodGroup(n.getDonor().getBloodGroup().name())
+                                                .city(n.getDonor().getCity())
+                                                // Only expose phone if donor accepted
+                                                .phone(n.getStatus() == com.rakhtsaathi.entity.enums.DonorResponseStatus.ACCEPTED
+                                                        ? n.getDonor().getPhone() : null)
+                                                .build())
+                                        .build(),
+                                (a, b) -> a // keep first on duplicate key
+                        ));
+
         return BloodRequestResponse.builder()
                 .id(request.getId())
+                .idStr(String.valueOf(request.getId()))  // for frontend .slice(-6)
                 .patientName(request.getPatientName())
                 .bloodGroup(request.getBloodGroup())
                 .unitsNeeded(request.getUnitsNeeded())
+                .unitsRequired(request.getUnitsNeeded())   // alias for frontend
                 .urgency(request.getUrgency())
+                .urgencyLevel(request.getUrgency())        // alias for frontend
                 .hospital(request.getHospital())
+                .hospitalName(request.getHospital())       // alias for frontend
                 .city(request.getCity())
                 .attendantName(request.getAttendantName())
                 .contactNumber(request.getContactNumber())
+                .attendantPhone(request.getContactNumber())
                 .additionalNotes(request.getAdditionalNotes())
+                .voiceMessageUrl(request.getVoiceMessageUrl())
+                .hasVoiceMessage(request.getHasVoiceMessage())
                 .status(request.getStatus())
                 .notifiedDonorsCount(request.getNotifiedDonorsCount())
                 .acceptedDonorsCount(request.getAcceptedDonorsCount())
                 .rejectedDonorsCount(request.getRejectedDonorsCount())
-                .donorNotifications(notifications)
+                .donorNotifications(notificationList)
+                .notifiedDonors(notifiedDonorsMap)
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
+                .fulfilledAt(request.getFulfilledAt())
                 .build();
     }
 }

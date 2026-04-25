@@ -25,7 +25,7 @@ public class BloodRequestController {
     private final BloodRequestService bloodRequestService;
     private final AuthService authService;
 
-    // POST /api/requests  (NEEDY only)
+    // POST /api/requests - Create blood request (NEEDY only)
     @PostMapping
     public ResponseEntity<ApiResponse<BloodRequestResponse>> createRequest(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -37,26 +37,29 @@ public class BloodRequestController {
                 .body(ApiResponse.success("Blood request created successfully", response));
     }
 
-    // GET /api/requests/{id}
+    // GET /api/requests/{id} - Get request by ID (any authenticated user)
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<BloodRequestResponse>> getRequest(@PathVariable Long id) {
         BloodRequestResponse response = bloodRequestService.getRequestById(id);
         return ResponseEntity.ok(ApiResponse.success("Request fetched", response));
     }
 
-    // GET /api/requests/my  (NEEDY - my requests)
+    // GET /api/requests/my - Get my requests (NEEDY dashboard + history)
+    // Frontend: getBloodRequests() filtered by needyId
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<Page<BloodRequestResponse>>> getMyRequests(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "ALL") String status) {
 
         User user = authService.getCurrentUser(userDetails.getUsername());
-        Page<BloodRequestResponse> requests = bloodRequestService.getMyRequests(user, page, size);
+        Page<BloodRequestResponse> requests = bloodRequestService.getMyRequests(user, page, size, status);
         return ResponseEntity.ok(ApiResponse.success("Requests fetched", requests));
     }
 
-    // PUT /api/requests/{id}/cancel  (NEEDY only)
+    // PUT /api/requests/{id}/cancel - Cancel request
+    // Frontend: updateBloodRequest(id, {status: 'CANCELLED'})
     @PutMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<BloodRequestResponse>> cancelRequest(
             @PathVariable Long id,
@@ -67,7 +70,8 @@ public class BloodRequestController {
         return ResponseEntity.ok(ApiResponse.success("Request cancelled", response));
     }
 
-    // PUT /api/requests/{id}/fulfill  (NEEDY only)
+    // PUT /api/requests/{id}/fulfill - Mark as fulfilled
+    // Frontend: updateBloodRequest(id, {status: 'FULFILLED'})
     @PutMapping("/{id}/fulfill")
     public ResponseEntity<ApiResponse<BloodRequestResponse>> fulfillRequest(
             @PathVariable Long id,
@@ -76,5 +80,18 @@ public class BloodRequestController {
         User user = authService.getCurrentUser(userDetails.getUsername());
         BloodRequestResponse response = bloodRequestService.fulfillRequest(id, user);
         return ResponseEntity.ok(ApiResponse.success("Request marked as fulfilled", response));
+    }
+
+    // POST /api/requests/{id}/notify - Manual trigger donor notification
+    // Frontend: triggerNotificationManually(id)
+    @PostMapping("/{id}/notify")
+    public ResponseEntity<ApiResponse<Integer>> triggerNotification(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        User user = authService.getCurrentUser(userDetails.getUsername());
+        int notified = bloodRequestService.triggerNotification(id, user);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Notification triggered. Notified " + notified + " donors.", notified));
     }
 }

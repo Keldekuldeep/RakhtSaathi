@@ -20,12 +20,14 @@ public class DonorNotification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "blood_request_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private BloodRequest bloodRequest;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "donor_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Donor donor;
 
     @Enumerated(EnumType.STRING)

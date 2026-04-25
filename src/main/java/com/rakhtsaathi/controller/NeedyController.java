@@ -2,7 +2,7 @@ package com.rakhtsaathi.controller;
 
 import com.rakhtsaathi.dto.request.NeedyProfileRequest;
 import com.rakhtsaathi.dto.response.ApiResponse;
-import com.rakhtsaathi.entity.Needy;
+import com.rakhtsaathi.dto.response.NeedyProfileResponse;
 import com.rakhtsaathi.entity.User;
 import com.rakhtsaathi.service.AuthService;
 import com.rakhtsaathi.service.NeedyService;
@@ -24,36 +24,36 @@ public class NeedyController {
     private final NeedyService needyService;
     private final AuthService authService;
 
-    // POST /api/needy/profile
+    // POST /api/needy/profile - Create profile after registration
     @PostMapping("/profile")
-    public ResponseEntity<ApiResponse<Long>> createProfile(
+    public ResponseEntity<ApiResponse<NeedyProfileResponse>> createProfile(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody NeedyProfileRequest request) {
 
         User user = authService.getCurrentUser(userDetails.getUsername());
-        Needy needy = needyService.createProfile(user, request);
+        NeedyProfileResponse response = needyService.createProfile(user, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Needy profile created successfully", needy.getId()));
+                .body(ApiResponse.success("Needy profile created successfully", response));
     }
 
-    // GET /api/needy/profile
+    // GET /api/needy/profile - Get my profile
     @GetMapping("/profile")
-    public ResponseEntity<ApiResponse<Needy>> getProfile(
+    public ResponseEntity<ApiResponse<NeedyProfileResponse>> getProfile(
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = authService.getCurrentUser(userDetails.getUsername());
-        Needy needy = needyService.getProfile(user);
-        return ResponseEntity.ok(ApiResponse.success("Profile fetched", needy));
+        NeedyProfileResponse response = needyService.getProfileResponse(user);
+        return ResponseEntity.ok(ApiResponse.success("Profile fetched", response));
     }
 
-    // PUT /api/needy/profile
+    // PUT /api/needy/profile - Update profile (city, phone, address, emergency contact)
     @PutMapping("/profile")
-    public ResponseEntity<ApiResponse<Long>> updateProfile(
+    public ResponseEntity<ApiResponse<NeedyProfileResponse>> updateProfile(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody NeedyProfileRequest request) {
 
         User user = authService.getCurrentUser(userDetails.getUsername());
-        Needy needy = needyService.updateProfile(user, request);
-        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", needy.getId()));
+        NeedyProfileResponse response = needyService.updateProfile(user, request);
+        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", response));
     }
 }

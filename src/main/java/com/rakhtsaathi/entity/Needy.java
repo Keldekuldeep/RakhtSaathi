@@ -1,5 +1,6 @@
 package com.rakhtsaathi.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -19,8 +20,9 @@ public class Needy {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JsonIgnore
     private User user;
 
     @Column(nullable = false)
@@ -35,11 +37,21 @@ public class Needy {
     @Column(nullable = false)
     private String relationToPatient;
 
+    // Optional profile fields
+    private String phone;
+    private String address;
+    private String state;
+    private String pincode;
+    private String emergencyContactName;
+    private String emergencyContactPhone;
+    private String emergencyContactRelation;
+
     @Column(nullable = false)
     @Builder.Default
     private Integer requestCount = 0;
 
     @OneToMany(mappedBy = "needy", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<BloodRequest> bloodRequests;
 
     @CreationTimestamp

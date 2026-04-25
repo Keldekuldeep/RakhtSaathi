@@ -14,6 +14,8 @@ public class DonorProfileRequest {
     @NotBlank(message = "City is required")
     private String city;
 
+    private String district;
+
     @NotBlank(message = "Phone number is required")
     @Pattern(regexp = "^[+]?[0-9]{10,13}$", message = "Invalid phone number")
     private String phone;
@@ -26,6 +28,12 @@ public class DonorProfileRequest {
     @NotNull(message = "Weight is required")
     @Min(value = 50, message = "Minimum weight is 50 kg")
     private Double weight;
+
+    private String gender;
+
+    private String aadhaarNumber;
+
+    private String lastDonationDate; // ISO date string from frontend
 
     private Boolean isAvailable = true;
 }
